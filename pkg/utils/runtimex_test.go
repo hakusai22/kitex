@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,17 @@
  * limitations under the License.
  */
 
-package generic
+package utils
 
 import (
-	"bytes"
-	"net/http"
-	"reflect"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/runtimex"
 )
 
-func TestFromHTTPPbRequest(t *testing.T) {
-	req, err := http.NewRequest("POST", "/far/boo", bytes.NewBuffer([]byte("321")))
-	test.Assert(t, err == nil)
-	hreq, err := FromHTTPPbRequest(req)
-	test.Assert(t, err == nil)
-	test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("321")), string(hreq.RawBody))
-	test.Assert(t, hreq.GetMethod() == "POST")
-	test.Assert(t, hreq.GetPath() == "/far/boo")
+func TestRuntimeXCompatibility(t *testing.T) {
+	_, err := runtimex.GID()
+	if err != nil {
+		t.Fatal("Your runtimex package is not compatible with current Go runtime version !!!!!!!!!")
+	}
 }

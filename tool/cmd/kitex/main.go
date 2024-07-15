@@ -20,10 +20,12 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/cloudwego/kitex"
 	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"
+	"github.com/cloudwego/kitex/tool/cmd/kitex/versions"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
@@ -38,13 +40,23 @@ func init() {
 			f.BoolVar(&queryVersion, "version", false,
 				"Show the version of kitex")
 		},
-		Check: func(a *kargs.Arguments) {
+		Check: func(a *kargs.Arguments) error {
 			if queryVersion {
 				println(a.Version)
 				os.Exit(0)
 			}
+			return nil
 		},
 	})
+	if err := versions.RegisterMinDepVersion(
+		&versions.MinDepVersion{
+			RefPath: "github.com/cloudwego/kitex",
+			Version: "v0.9.0",
+		},
+	); err != nil {
+		log.Warn(err)
+		os.Exit(versions.CompatibilityCheckExitCode)
+	}
 }
 
 func main() {
@@ -59,12 +71,36 @@ func main() {
 		}
 	}
 
+	curpath, err := filepath.Abs(".")
+	if err != nil {
+		log.Warn("Get current path failed:", err.Error())
+		os.Exit(1)
+	}
 	// run as kitex
-	args.ParseArgs(kitex.Version)
+	err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
+	if err != nil {
+		log.Warn(err.Error())
+		os.Exit(2)
+	}
+	if !args.NoDependencyCheck {
+		// check dependency compatibility between kitex cmd tool and dependency in go.mod
+		if err := versions.DefaultCheckDependencyAndProcess(); err != nil {
+			os.Exit(versions.CompatibilityCheckExitCode)
+		}
+	}
 
 	out := new(bytes.Buffer)
-	cmd := args.BuildCmd(out)
-	err := cmd.Run()
+	cmd, err := args.BuildCmd(out)
+	if err != nil {
+		log.Warn(err)
+		os.Exit(1)
+	}
+	err = kargs.ValidateCMD(cmd.Path, args.IDLType)
+	if err != nil {
+		log.Warn(err)
+		os.Exit(1)
+	}
+	err = cmd.Run()
 	if err != nil {
 		if args.Use != "" {
 			out := strings.TrimSpace(out.String())
